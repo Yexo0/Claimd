@@ -1,0 +1,13 @@
+[project]
+name = "claimd"
+version = "0.3.0"
+description = "Vérifie la disponibilité d'un pseudo sur plusieurs plateformes."
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    # Recent Starlette versions nudge TestClient users towards httpx2; harmless for our tests.
+    "ignore:Using `httpx` with `starlette.testclient`",
+]

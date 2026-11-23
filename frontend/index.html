@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="fr" class="no-js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#08080c">
+  <meta name="description" content="Claimd vérifie en parallèle si un pseudo est libre sur Twitch, YouTube, Instagram, TikTok, Kick, Bluesky et Steam.">
+  <title>Claimd · ton pseudo est-il libre ?</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/geist-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/css/style.css">
+  <script>
+    // Before first paint: enable JS-only styles, and never leave the intro hidden
+    // if a script fails to load.
+    (function (root) {
+      root.classList.replace('no-js', 'js');
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) root.classList.add('reduce-motion');
+      setTimeout(function () { root.classList.add('intro-done'); }, 2500);
+    })(document.documentElement);
+  </script>
+  <script defer src="/vendor/gsap/gsap.min.js"></script>
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body>
+  <div class="backdrop" aria-hidden="true">
+    <div class="backdrop__glow"></div>
+    <div class="backdrop__grid"></div>
+  </div>
+
+  <div class="shell">
+    <header class="topbar" data-intro>
+      <a class="brand" href="/" aria-label="Claimd, accueil">
+        <span class="brand__mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M6.5 12.5l3.6 3.6L17.5 8.5" /></svg>
+        </span>
+        <span class="brand__name">Claimd</span>
+      </a>
+      <div class="topbar__meta">
+        <span class="server-pill" id="server-pill" data-state="pending">
+          <span class="server-pill__dot" aria-hidden="true"></span>
+          <span class="server-pill__label">Connexion…</span>
+        </span>
+        <span class="topbar__by">by <strong>Yexo</strong></span>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow" data-intro>
+          <span class="eyebrow__dot" aria-hidden="true"></span>
+          Vérifié en parallèle, depuis ta machine
+        </p>
+        <h1 class="hero__title" data-intro>
+          Ton pseudo est-il
+          <span class="hero__accent">libre<svg class="hero__underline" viewBox="0 0 120 14" preserveAspectRatio="none" aria-hidden="true"><path d="M3 9.5C28 4.5 70 3 117 6.5" pathLength="1" /></svg></span>&nbsp;?
+        </h1>
+        <p class="hero__lead" data-intro>
+          Une saisie, toutes les plateformes en même temps. Rien n'est deviné&nbsp;: quand une plateforme bloque, Claimd le dit.
+        </p>
+
+        <form id="search" class="search" data-intro autocomplete="off" novalidate role="search">
+          <label for="username" class="sr-only">Pseudo à vérifier</label>
+          <div class="search__field">
+            <span class="search__at" aria-hidden="true">@</span>
+            <input id="username" name="username" class="search__input" type="text"
+                   placeholder="yexo" maxlength="64" spellcheck="false" autocomplete="off"
+                   autocapitalize="off" autocorrect="off" enterkeyhint="search"
+                   aria-describedby="form-error search-hint">
+            <kbd class="search__kbd" id="search-hint" title="Appuie sur Entrée pour vérifier">
+              <span class="sr-only">Appuie sur Entrée pour vérifier</span><span aria-hidden="true">↵</span>
+            </kbd>
+          </div>
+          <button id="submit" class="search__button" type="submit">
+            <span class="search__button-label">Vérifier</span>
+            <svg class="search__button-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9.5M8.5 4l4 4-4 4" /></svg>
+            <span class="search__button-loader" aria-hidden="true"><i></i><i></i><i></i></span>
+          </button>
+        </form>
+        <p id="form-error" class="form-error" role="alert"></p>
+      </section>
+
+      <section class="results" aria-label="Résultats">
+        <div class="summary" id="summary" data-state="idle">
+          <div class="summary__row">
+            <p class="summary__text" id="summary-text" aria-live="polite"></p>
+            <div class="summary__actions">
+              <span class="summary__time" id="summary-time"></span>
+              <button class="copy" id="copy" type="button">
+                <svg class="copy__icon copy__icon--copy" viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="2" /><path d="M10.5 3.5v-.5a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 3v5A1.5 1.5 0 0 0 4 9.5h.5" /></svg>
+                <svg class="copy__icon copy__icon--done" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" pathLength="1" /></svg>
+                <span class="copy__label">Copier</span>
+              </button>
+            </div>
+          </div>
+          <div class="segments" id="segments" aria-hidden="true"></div>
+        </div>
+
+        <div class="grid" id="grid" aria-busy="false"></div>
+      </section>
+    </main>
+
+    <footer class="footer" data-intro>
+      <p>
+        Les requêtes partent de ta connexion, une par plateforme. En cas de doute, la carte affiche « incertain ».
+      </p>
+      <p class="footer__links">
+        <a href="https://github.com/Yexo0/Claimd" target="_blank" rel="noopener noreferrer">Code source</a>
+        <span aria-hidden="true">·</span>
+        <a href="/docs" target="_blank" rel="noopener">API</a>
+        <span aria-hidden="true">·</span>
+        <span>Logos&nbsp;: Simple Icons</span>
+      </p>
+    </footer>
+  </div>
+
+  <template id="card-template">
+    <article class="card" data-state="idle">
+      <span class="card__tone" aria-hidden="true"></span>
+      <span class="card__flash" aria-hidden="true"></span>
+      <span class="card__edge" aria-hidden="true"></span>
+      <header class="card__head">
+        <span class="card__logo" aria-hidden="true"></span>
+        <div class="card__titles">
+          <h2 class="card__name"></h2>
+          <p class="card__method"></p>
+        </div>
+        <span class="card__time"></span>
+      </header>
+      <div class="card__status">
+        <span class="card__icon"></span>
+        <span class="card__label"></span>
+      </div>
+      <div class="card__body">
+        <p class="card__detail"></p>
+        <span class="card__skeleton" aria-hidden="true"><i></i><i></i></span>
+      </div>
+      <footer class="card__foot">
+        <button class="reliability" type="button" data-tip="">
+          <span class="meter" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="reliability__info" aria-hidden="true"></span>
+          <span class="reliability__label"></span>
+        </button>
+        <a class="card__link" target="_blank" rel="noopener noreferrer" hidden></a>
+        <div class="ask" role="group" aria-label="Ce que tu as vu sur la plateforme">
+          <span class="ask__q">Résultat&nbsp;?</span>
+          <button class="ask__btn" type="button" data-verdict="taken">Pris</button>
+          <button class="ask__btn" type="button" data-verdict="available">Libre</button>
+          <button class="ask__btn ask__cancel" type="button" aria-label="Annuler">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>
+          </button>
+        </div>
+      </footer>
+    </article>
+  </template>
+
+  <div class="tooltip" id="tooltip" role="tooltip"></div>
+</body>
+</html>
