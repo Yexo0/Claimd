@@ -1,12 +1,50 @@
+<div align="center">
+
 # Claimd
 
-Vérifie en un coup d'œil si un pseudo est libre sur **Twitch, YouTube, Instagram, TikTok,
-Kick, Bluesky et Steam** (et pourquoi Gmail ne peut pas l'être).
-Tu tapes `yexo`, Claimd interroge toutes les plateformes **en parallèle** et affiche,
-carte par carte, **libre**, **pris** ou **incertain**, avec la fiabilité de chaque vérification.
+**Ton pseudo est-il libre ?**<br>
+Une saisie, sept plateformes vérifiées en parallèle, depuis ta machine. Rien n'est deviné.
+
+[![Tests](https://github.com/Yexo0/Claimd/actions/workflows/tests.yml/badge.svg)](https://github.com/Yexo0/Claimd/actions/workflows/tests.yml)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)
+![Docker](https://img.shields.io/badge/docker%20compose-une%20commande-2496ED?logo=docker&logoColor=white)
+
+<img src="docs/demo.gif" width="800" alt="Recherche de « yexofps » : les cartes Twitch, YouTube, Instagram, TikTok, Kick, Bluesky, Steam et Gmail passent en chargement puis se révèlent une par une, avec le résumé « libre sur 1/7 plateformes ».">
+
+</div>
+
+Claimd vérifie si un pseudo est libre sur **Twitch, YouTube, Instagram, TikTok, Kick,
+Bluesky et Steam**, et explique pourquoi Gmail ne peut pas l'être. Tu tapes `yexofps`,
+toutes les plateformes sont interrogées **en même temps**, et chaque carte affiche
+**libre**, **pris** ou **incertain**, avec la fiabilité de la vérification.
 
 Claimd tourne **sur ta machine** : tu clones, tu lances une commande, tu ouvres
 `http://localhost:8000`. Pas de service hébergé, pas de compte, aucun coût.
+
+### Points forts
+
+- **Résultats en direct** : chaque carte s'affiche dès que sa plateforme a répondu, sans
+  attendre la plus lente.
+- **Honnête** : chaque résultat indique sa fiabilité (API officielle, sonde de page…). Quand
+  une plateforme bloque ou répond de façon ambiguë, la carte dit « incertain », jamais un
+  résultat deviné.
+- **Vérification en un clic** : sur une carte incertaine, tu ouvres le profil, tu indiques
+  ce que tu as vu, la carte et le résumé se mettent à jour.
+- **Propre** : pas de contournement des protections des plateformes, des requêtes qui
+  s'identifient comme Claimd, aucun cookie conservé.
+- **Simple à lancer et à étendre** : Docker ou `pip` + une commande, et une plateforme =
+  un module Python.
+
+### Aperçu
+
+<img src="docs/manual-check.png" alt="Rangée de cartes : Twitch, YouTube et TikTok « Pris » en rouge ; Instagram « Incertain » en ambre, dont le pied de carte demande « Résultat ? Pris / Libre »." width="100%">
+
+<p align="center"><em>Instagram bloque la vérification : la carte propose de trancher toi-même en un clic.</em></p>
+
+<p align="center">
+  <img src="docs/mobile.png" width="300" alt="Vue mobile : le champ de recherche, le résumé « @yexofps est libre sur 1/7 plateformes » avec sa barre segmentée, puis la carte Twitch « Pris ».">
+</p>
 
 ---
 
@@ -454,6 +492,9 @@ pip install -r requirements-dev.txt
 ```bash
 pytest
 ```
+
+La CI GitHub Actions lance la suite sur Python 3.10, 3.12 et 3.13 et vérifie l'image Docker
+à chaque push et pull request (badge en haut de cette page).
 
 Les tests n'utilisent **jamais le réseau** : toute connexion réelle est refusée pendant
 la suite, et les réponses des plateformes sont simulées avec `respx` d'après la forme
