@@ -1,6 +1,7 @@
 # Claimd
 
-Vérifie en un coup d'œil si un pseudo est libre sur **Twitch, YouTube, Instagram et TikTok**.
+Vérifie en un coup d'œil si un pseudo est libre sur **Twitch, YouTube, Instagram, TikTok,
+Kick, Bluesky et Steam** (et pourquoi Gmail ne peut pas l'être).
 Tu tapes `yexo`, Claimd interroge toutes les plateformes **en parallèle** et affiche,
 carte par carte, **libre**, **pris** ou **incertain**, avec la fiabilité de chaque vérification.
 
@@ -25,7 +26,7 @@ cd Claimd
 cp .env.example .env
 ```
 
-Renseigne tes clés Twitch dans `.env` (facultatif, voir [Clés Twitch](#clés-twitch)), puis :
+Renseigne tes clés Twitch et Kick dans `.env` (facultatif, voir [Clés Twitch et Kick](#clés-twitch-et-kick)), puis :
 
 ```bash
 docker compose up -d --build
@@ -71,10 +72,14 @@ uvicorn claimd.main:app --reload
 
 ---
 
-## Clés Twitch
+## Clés Twitch et Kick
 
-Twitch est vérifié par son **API officielle (Helix)**, qui demande les identifiants
-d'une application Twitch. C'est gratuit et ça prend deux minutes :
+Twitch et Kick sont vérifiés par leur **API officielle**, qui demande les identifiants
+d'une application (gratuite). Sans clés, l'app fonctionne quand même : la carte
+concernée affiche « incertain » avec un message qui indique quoi configurer.
+`.env` est dans `.gitignore`, tes clés ne partent jamais dans le dépôt.
+
+### Twitch
 
 1. Connecte-toi sur <https://dev.twitch.tv/console/apps>
    (Twitch exige que l'authentification à deux facteurs soit activée sur ton compte).
@@ -85,18 +90,24 @@ d'une application Twitch. C'est gratuit et ça prend deux minutes :
    - *Client Type* : **Confidential**.
 3. Ouvre l'application créée (**Manage**), copie le **Client ID**, puis clique **New Secret**
    et copie le secret.
-4. Colle-les dans `.env` :
+4. Colle-les dans `.env` puis redémarre Claimd :
 
    ```dotenv
    TWITCH_CLIENT_ID=ton_client_id
    TWITCH_CLIENT_SECRET=ton_secret
    ```
 
-5. Redémarre Claimd.
+### Kick
 
-Sans clés, l'app fonctionne quand même : la carte Twitch affiche « incertain » avec
-un message qui indique quoi configurer. Les autres plateformes n'ont besoin d'aucune clé.
-`.env` est dans `.gitignore`, tes clés ne partent jamais dans le dépôt.
+1. Sur kick.com, ouvre **Paramètres → onglet Developer** (Kick exige aussi la double
+   authentification), et crée une application. Redirect URL : `http://localhost`.
+   Claimd n'utilise qu'un jeton d'application, aucune permission particulière n'est nécessaire.
+2. Copie le **Client ID** et le **Client Secret** dans `.env`, puis redémarre Claimd :
+
+   ```dotenv
+   KICK_CLIENT_ID=ton_client_id
+   KICK_CLIENT_SECRET=ton_secret
+   ```
 
 ---
 
@@ -111,9 +122,16 @@ captcha, mur de connexion, timeout ou réponse ambiguë donnent `available: null
 |---|---|---|---|---|
 | **Twitch** | API officielle Helix | haute | haute | clés absentes/refusées, quota, réseau |
 | **YouTube** | `HEAD youtube.com/@pseudo` | moyenne | moyenne | redirection hors YouTube (consentement, vérification), 429 |
-| **Instagram** | page profil, au mieux | moyenne | faible | mur de connexion (très fréquent), challenge, page sans indice |
+| **Instagram** | page profil, au mieux | moyenne (haute avec ta session) | faible (moyenne avec ta session) | mur de connexion (très fréquent), challenge, page sans indice |
 | **TikTok** | données publiques de la page profil | moyenne | faible | captcha, page sans données, code inconnu |
+| **Kick** | API officielle | haute | haute | clés absentes/refusées, quota, réseau |
+| **Bluesky** | API publique officielle (AT Protocol) | haute | moyenne | quota, réponse inattendue |
+| **Steam** | vue XML publique de l'URL perso | haute | haute | quota, page inattendue |
 | **Gmail** | aucune : **non vérifiable** | — | — | toujours, sauf pseudo contraire aux règles de Gmail |
+
+Une carte « incertaine » propose toujours un lien **Vérifier ↗** : tu ouvres le profil dans
+ton navigateur, puis tu indiques ce que tu as vu (**Pris** ou **Libre**). La carte et le
+résumé se mettent à jour, avec la mention « vérifié par toi ».
 
 Chaque carte affiche la fiabilité sous forme de jauge ; un survol (ou un focus clavier)
 explique comment la plateforme est vérifiée et ses limites.
@@ -137,17 +155,34 @@ explique comment la plateforme est vérifiée et ses limites.
   que rien ne soit visible.
 - Règles : 3 à 30 caractères, lettres (75 langues) et chiffres, `_ - . ·` mais pas au début ni à la fin.
 
-### Instagram : au mieux
+### Instagram : au mieux, en trois niveaux
 
-- `GET instagram.com/pseudo/`, sans suivre les redirections.
-- **Pris** seulement si la page décrit explicitement ce profil (lien `instagram://user?username=…`,
-  titre « Nom (@pseudo) », JSON du profil). **Libre** seulement sur un vrai 404.
-- Instagram redirige souvent les visiteurs non connectés vers sa page de connexion
-  (systématiquement depuis une IP de datacenter, parfois depuis une connexion
-  résidentielle). C'est un contrôle d'accès : Claimd **ne le contourne pas** et affiche
-  « incertain » avec un lien pour vérifier soi-même.
-- Règles : 1 à 30 caractères, lettres, chiffres, `_` et `.`, pas de point au début, à la
-  fin ni deux à la suite.
+Instagram redirige souvent les visiteurs non connectés vers sa page de connexion
+(presque toujours depuis une IP de datacenter, moins souvent depuis une connexion
+résidentielle). C'est un contrôle d'accès : Claimd **ne le contourne pas** (pas de
+déguisement en navigateur, pas de proxys, pas d'API internes). À la place :
+
+1. **Sonde de la page profil** (par défaut). `GET instagram.com/pseudo/` sans suivre les
+   redirections. **Pris** seulement si la page décrit explicitement ce profil (lien
+   `instagram://user?username=…`, titre « Nom (@pseudo) », JSON du profil) ; **libre**
+   seulement sur un vrai 404 ; sinon « incertain ». Les réponses sont gardées
+   **10 minutes** (60 s pour un blocage) : relancer une recherche ne sollicite pas
+   Instagram une seconde fois, ce qui évite d'aggraver sa limitation. Ces résultats
+   portent le badge « cache ».
+2. **Ta propre session (option, désactivée par défaut).** Avec `INSTAGRAM_SESSIONID` dans
+   `.env`, Claimd consulte le profil connecté avec ton compte, comme ton navigateur :
+   « pris » passe en fiabilité haute. ⚠️ Instagram interdit l'accès automatisé : c'est
+   **le compte de cette session** qui risque une restriction (évite ton compte principal),
+   et cette valeur donne accès au compte, ne la partage jamais. Le cookie n'est envoyé
+   qu'à `www.instagram.com`. Pour la trouver : connecte-toi sur instagram.com dans ton
+   navigateur, ouvre les outils de développement (`F12`) → **Application** (Chrome) ou
+   **Stockage** (Firefox) → **Cookies** → `https://www.instagram.com`, et copie la valeur
+   de `sessionid`. Elle expire si tu te déconnectes : la carte te le signale.
+3. **Vérification en un clic.** Si la carte reste « incertaine », **Vérifier ↗** ouvre le
+   profil dans ton navigateur, puis **Pris** / **Libre** met la carte à jour.
+
+Règles : 1 à 30 caractères, lettres, chiffres, `_` et `.`, pas de point au début, à la fin
+ni deux à la suite.
 
 ### TikTok : au mieux
 
@@ -159,6 +194,31 @@ explique comment la plateforme est vérifiée et ses limites.
 - Pas de JSON (captcha, page de vérification) ou code inconnu → « incertain ».
 - Règles : 2 à 24 caractères, lettres, chiffres, `_` et `.`, pas de point à la fin.
 
+### Kick : fiable
+
+- Comme Twitch : jeton d'application (`POST id.kick.com/oauth/token`, mis en cache), puis
+  `GET api.kick.com/public/v1/channels?slug=…`. Les pseudos Kick peuvent contenir `_` mais
+  les adresses de chaîne utilisent `-` (`Yexo_FPS` → `kick.com/yexo-fps`) : les deux
+  écritures sont demandées en une seule requête.
+- **Libre** veut dire « aucune chaîne active » : un compte banni peut encore bloquer le nom.
+- Règles : jusqu'à 25 caractères, lettres, chiffres, `_` et `-`.
+
+### Bluesky : fiable
+
+- API publique officielle, sans clé : `com.atproto.identity.resolveHandle` dit si
+  `pseudo.bsky.social` est attribué à un compte.
+- **Libre** est en fiabilité moyenne : Bluesky réserve certains noms. Les handles sur
+  domaine personnalisé (`yexo.com`) ne sont pas couverts.
+- Règles : 3 à 18 caractères, lettres, chiffres et `-`, pas de tiret au début ni à la fin.
+
+### Steam : fiable
+
+- Sur Steam, le seul identifiant unique est l'**URL personnalisée**
+  (`steamcommunity.com/id/pseudo`) ; le nom affiché, lui, n'a pas besoin d'être unique.
+- Claimd lit la vue XML publique de cette URL (`?xml=1`) : un profil avec son `steamID64`
+  → **pris** ; « The specified profile could not be found » → **libre**.
+- Règles : 3 à 32 caractères, lettres, chiffres, `_` et `-`.
+
 ### Gmail : non vérifiable, volontairement
 
 Savoir si une adresse Gmail existe **n'est pas faisable de façon fiable et légitime** :
@@ -169,7 +229,7 @@ Claimd n'implémente donc **ni énumération SMTP ni scraping** et **n'envoie ri
 La case Gmail affiche « non vérifiable » avec l'explication au survol. Seule exception,
 locale et certaine : si le pseudo enfreint les règles publiques de Gmail (6 à 30 caractères,
 lettres, chiffres et points), la case indique « invalide ici ». Gmail n'entre jamais dans
-le compte « libre sur X/4 ».
+le compte « libre sur X/7 ».
 
 ---
 
@@ -178,8 +238,11 @@ le compte « libre sur X/4 ».
 ```
 navigateur ──GET /check/yexo/stream──▶ FastAPI ──┬─▶ twitch     (API Helix)
    ▲                                             ├─▶ youtube    (HEAD du handle)
-   │   une ligne JSON par plateforme,            ├─▶ instagram  (page profil)
+   │   une ligne JSON par plateforme,            ├─▶ instagram  (page profil, cache 10 min)
    └──── dès qu'elle a répondu ◀─────────────────┼─▶ tiktok     (JSON de la page)
+                                                 ├─▶ kick       (API officielle)
+                                                 ├─▶ bluesky    (API AT Protocol)
+                                                 ├─▶ steam      (XML public)
                                                  └─▶ gmail      (règles locales uniquement)
 ```
 
@@ -201,18 +264,20 @@ navigateur ──GET /check/yexo/stream──▶ FastAPI ──┬─▶ twitch 
 ```
 claimd/
   main.py            routes HTTP (dont le streaming) + service du frontend
-  runner.py          exécution parallèle, timeouts, flux, résumé
+  runner.py          exécution parallèle, timeouts, cache, flux, résumé
   models.py          modèle Result commun
   config.py          lecture de .env
   http.py            client HTTP partagé (User-Agent, sans cookies)
   checkers/
     __init__.py      registre des plateformes (ordre d'affichage)
     base.py          Platform : métadonnées + construction des résultats
-    twitch.py  youtube.py  instagram.py  tiktok.py  gmail.py
+    oauth.py         jeton d'application OAuth partagé (Twitch, Kick)
+    twitch.py  youtube.py  instagram.py  tiktok.py
+    kick.py  bluesky.py  steam.py  gmail.py
 frontend/
   index.html
   css/style.css      tokens, états des cartes, boucles d'attente
-  js/app.js          orchestration (recherche, file de révélation, résumé, copie)
+  js/app.js          orchestration (recherche, révélation, vérification manuelle, résumé)
   js/api.js          client du flux NDJSON (repli sur la route agrégée)
   js/motion.js       toutes les animations GSAP
   js/tooltip.js      infobulles accessibles
@@ -226,14 +291,19 @@ tests/
 
 ## Interface
 
-- **Une seule page** : un grand champ central (bordure animée au focus), une carte par
-  plateforme vérifiable, la case Gmail à part, et un résumé « `@yexo` est libre sur 2/4 plateformes »
-  avec une barre segmentée et un bouton pour **copier le pseudo**.
+- **Une seule page** : un grand champ central (bordure animée au focus), une grille de
+  8 cartes (la carte Gmail en pointillés, purement informative), et un résumé
+  « `@yexo` est libre sur 2/7 plateformes » avec une barre segmentée et un bouton pour
+  **copier le pseudo**.
 - **Chargement** : chaque carte passe en squelette animé, avec un halo qui se propage
   d'une carte à l'autre et un anneau de progression.
 - **Résultats** : les cartes se révèlent une par une, dans l'ordre où les plateformes
   répondent, avec un léger espacement. Une coche se dessine pour « libre », une croix
   pour « pris », un point d'interrogation pour « incertain ».
+- **Vérification en un clic** sur toute carte « incertaine » : **Vérifier ↗** ouvre le
+  profil, puis **Pris** / **Libre** met à jour la carte (badge « manuel ») et le résumé.
+- Badges de temps : durée de la vérification, « cache » pour un résultat réutilisé,
+  « manuel » pour ton propre verdict.
 - **Couleur = sens** : vert libre, rouge pris, ambre incertain, gris invalide ou non
   vérifiable. Le violet est réservé à l'identité (champ, bouton, chargement).
 - **Stabilité** : chaque zone a sa hauteur réservée, rien ne saute quand les résultats arrivent.
@@ -258,7 +328,7 @@ un `@` initial sont retirés.
 {
   "username": "yexo",
   "elapsed_ms": 812,
-  "summary": { "total": 5, "checkable": 4, "available": 2, "taken": 1, "uncertain": 1, "invalid": 1 },
+  "summary": { "total": 8, "checkable": 7, "available": 2, "taken": 4, "uncertain": 1, "invalid": 1 },
   "results": [
     {
       "platform": "twitch",
@@ -271,7 +341,8 @@ un `@` initial sont retirés.
       "reason": null,
       "detail": "Compte « Yexo », créé en 2016.",
       "url": "https://www.twitch.tv/yexo",
-      "elapsed_ms": 228
+      "elapsed_ms": 228,
+      "cached": false
     }
   ]
 }
@@ -286,7 +357,7 @@ un `@` initial sont retirés.
 | `unverifiable` | `null` | Aucune méthode légitime de vérification (Gmail) |
 
 Pour un résultat `uncertain`, `reason` donne la cause : `timeout`, `network_error`,
-`rate_limited`, `blocked`, `login_wall`, `not_configured`, `auth_failed`,
+`rate_limited`, `blocked`, `login_wall`, `session_expired`, `not_configured`, `auth_failed`,
 `unexpected_response`, `ambiguous`, `internal_error`.
 
 Le résumé « libre sur X/N » correspond à `summary.available` / `summary.checkable`
@@ -300,7 +371,7 @@ Mêmes vérifications, diffusées en **NDJSON** (une ligne JSON par événement)
 à mesure que les plateformes répondent. C'est ce qu'utilise l'interface.
 
 ```
-{"type": "start", "username": "yexo", "platforms": ["twitch", "youtube", "instagram", "tiktok", "gmail"]}
+{"type": "start", "username": "yexo", "platforms": ["twitch", "youtube", "instagram", "tiktok", "kick", "bluesky", "steam", "gmail"]}
 {"type": "result", "result": { …même forme que ci-dessus… }}
 …
 {"type": "done", "username": "yexo", "elapsed_ms": 812, "summary": { … }}
@@ -347,8 +418,10 @@ cartes avant toute recherche.
 2. Ajoute le module au tuple `CHECKERS` de `claimd/checkers/__init__.py`.
    L'ordre du tuple est l'ordre d'affichage. Pour retirer une plateforme, enlève-la du tuple.
 
-Le runner s'occupe du timeout, des exceptions et du temps de réponse : un checker n'a
-qu'à décider quel résultat s'applique. L'interface crée la carte toute seule (logo :
+Le runner s'occupe du timeout, des exceptions, du temps de réponse et du cache
+(`cache_ttl=600` dans `Platform` pour réutiliser une réponse 10 minutes) : un checker n'a
+qu'à décider quel résultat s'applique. Pour une API à clés (client credentials), réutilise
+`claimd.checkers.oauth.AppToken`, comme `twitch.py` et `kick.py`. L'interface crée la carte toute seule (logo :
 ajoute son tracé dans `frontend/js/icons.js`, sinon l'initiale est affichée).
 
 ---

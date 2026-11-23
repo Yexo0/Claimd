@@ -23,7 +23,11 @@ const RELIABILITY_LABEL = {
 
 const METHOD_LABEL = {
   helix_api: 'API officielle',
+  official_api: 'API officielle',
+  public_profile: 'Profil public',
   http_probe: 'Sonde du profil',
+  session_probe: 'Ta session Instagram',
+  manual: 'Vérifié par toi',
   none: 'Aucune méthode légitime',
 };
 
@@ -31,6 +35,11 @@ const LINK_LABEL = {
   available: 'Profil ↗',
   taken: 'Profil ↗',
   uncertain: 'Vérifier ↗',
+};
+
+const MANUAL_DETAIL = {
+  taken: 'Vérifié par toi : un profil existe à ce nom.',
+  available: 'Vérifié par toi : aucun profil visible. Un compte désactivé peut encore bloquer ce nom.',
 };
 
 // ---------------------------------------------------------------- DOM
@@ -46,20 +55,20 @@ const els = {
   segments: $('segments'),
   copy: $('copy'),
   grid: $('grid'),
-  extras: $('extras'),
   pill: $('server-pill'),
   cardTemplate: $('card-template'),
-  miniTemplate: $('mini-template'),
 };
 
 const state = {
   platforms: new Map(), // id -> platform info
-  views: new Map(), // id -> { el, kind: 'card' | 'mini', seg? }
+  views: new Map(), // id -> { el, seg? }
   run: 0, // increments on every search; stale callbacks compare against it
   controller: null,
   revealAt: 0,
   chain: Promise.resolve(),
   username: '',
+  elapsed: null,
+  done: false,
 };
 
 // ---------------------------------------------------------------- helpers
@@ -93,13 +102,17 @@ function showError(message) {
 function createCard(platform, index) {
   const el = els.cardTemplate.content.firstElementChild.cloneNode(true);
   el.dataset.platform = platform.id;
+  if (!platform.verifiable) el.dataset.variant = 'info';
   el.style.setProperty('--i', index);
   el.querySelector('.card__logo').append(brandIcon(platform.id, platform.label));
   el.querySelector('.card__icon').append(statusIcon());
   el.querySelector('.card__name').textContent = platform.label;
   el.querySelector('.card__method').textContent = METHOD_LABEL[platform.method] || platform.method;
+  el.querySelector('.reliability__info').append(infoIcon());
   const reliability = el.querySelector('.reliability');
-  reliability.dataset.tipTitle = `${platform.label} · comment c'est vérifié`;
+  reliability.dataset.tipTitle = platform.verifiable
+    ? `${platform.label} · comment c'est vérifié`
+    : `Pourquoi ${platform.label} n'est pas vérifié`;
   reliability.dataset.tip = platform.note || '';
 
   // Cursor spotlight
@@ -110,20 +123,6 @@ function createCard(platform, index) {
   });
 
   els.grid.append(el);
-  return el;
-}
-
-function createMini(platform) {
-  const el = els.miniTemplate.content.firstElementChild.cloneNode(true);
-  el.dataset.platform = platform.id;
-  el.querySelector('.mini__logo').append(brandIcon(platform.id, platform.label));
-  el.querySelector('.mini__name').textContent = platform.label;
-  const info = el.querySelector('.mini__info');
-  info.append(infoIcon());
-  info.setAttribute('aria-label', `Pourquoi ${platform.label} n'est pas vérifiable`);
-  info.dataset.tipTitle = `Pourquoi ${platform.label} n'est pas vérifié`;
-  info.dataset.tip = platform.note || '';
-  els.extras.append(el);
   return el;
 }
 
@@ -142,42 +141,41 @@ function createSegment(platform, index) {
 
 function addPlatform(platform) {
   state.platforms.set(platform.id, platform);
-  if (platform.verifiable) {
-    const index = [...state.views.values()].filter((v) => v.kind === 'card').length;
-    const view = { kind: 'card', el: createCard(platform, index), seg: createSegment(platform, index) };
-    state.views.set(platform.id, view);
-  } else {
-    state.views.set(platform.id, { kind: 'mini', el: createMini(platform) });
-  }
+  const index = state.views.size;
+  const view = { el: createCard(platform, index) };
+  if (platform.verifiable) view.seg = createSegment(platform, els.segments.children.length);
+  state.views.set(platform.id, view);
   paintIdle(platform.id);
-  return state.views.get(platform.id);
+  return view;
 }
 
-function paint(id, status, { detail = '', url = null, reliability, elapsed = null } = {}) {
+function paint(id, status, { detail = '', url = null, reliability, elapsed = null, method, cached = false, manual = false } = {}) {
   const view = state.views.get(id);
   if (!view) return;
   const platform = state.platforms.get(id);
   const { el } = view;
   el.dataset.state = status;
-
-  if (view.kind === 'mini') {
-    el.querySelector('.mini__pill').textContent = STATUS_LABEL[status] || status;
-    el.querySelector('.mini__detail').textContent = detail;
-    el.querySelector('.mini__detail').title = detail;
-    return;
-  }
+  delete el.dataset.asking;
+  if (manual) el.dataset.manual = '';
+  else delete el.dataset.manual;
 
   el.querySelector('.card__label').textContent = STATUS_LABEL[status] || status;
+  el.querySelector('.card__method').textContent = METHOD_LABEL[method || platform.method] || method || platform.method;
   const detailEl = el.querySelector('.card__detail');
   detailEl.textContent = detail;
   detailEl.title = detail; // full text on hover if clamped to 3 lines
-  el.querySelector('.card__time').textContent = formatMs(elapsed);
+
+  const time = el.querySelector('.card__time');
+  time.textContent = manual ? 'manuel' : cached ? 'cache' : formatMs(elapsed);
+  time.dataset.kind = manual ? 'manual' : cached ? 'cached' : 'timing';
+  time.title = cached ? 'Résultat réutilisé : vérifié il y a moins de 10 minutes.' : '';
 
   const level = reliability || platform.reliability;
   const rel = el.querySelector('.reliability');
   rel.dataset.level = level;
-  rel.querySelector('.reliability__label').textContent = RELIABILITY_LABEL[level] || '';
-  rel.setAttribute('aria-label', `${RELIABILITY_LABEL[level] || ''}. Comment ${platform.label} est vérifié`);
+  const relText = status === 'unverifiable' ? 'Pourquoi ?' : RELIABILITY_LABEL[level] || '';
+  rel.querySelector('.reliability__label').textContent = relText;
+  rel.setAttribute('aria-label', status === 'unverifiable' ? `Pourquoi ${platform.label} n'est pas vérifié` : `${relText}. Comment ${platform.label} est vérifié`);
 
   const link = el.querySelector('.card__link');
   link.hidden = !url;
@@ -203,6 +201,17 @@ function paintIdle(id) {
 
 // ---------------------------------------------------------------- summary
 
+function computeSummary() {
+  const summary = { checkable: 0, available: 0, taken: 0, uncertain: 0, invalid: 0 };
+  for (const [id, view] of state.views) {
+    if (!state.platforms.get(id).verifiable) continue;
+    summary.checkable += 1;
+    const status = view.el.dataset.state;
+    if (status in summary) summary[status] += 1;
+  }
+  return summary;
+}
+
 function summaryIdle() {
   els.summary.dataset.state = 'idle';
   delete els.summary.dataset.tone;
@@ -227,7 +236,7 @@ function summaryLoading(username) {
   els.copy.querySelector('.copy__label').textContent = 'Copier';
 }
 
-function summaryDone({ username, summary, elapsed_ms: elapsed }) {
+function summaryDone(username, summary, elapsed, from = 0) {
   const { available, checkable, taken } = summary;
   els.summary.dataset.state = 'done';
   els.summary.dataset.tone =
@@ -240,9 +249,54 @@ function summaryDone({ username, summary, elapsed_ms: elapsed }) {
   count.textContent = String(available);
   const word = checkable > 1 ? 'plateformes' : 'plateforme';
   els.summaryText.replaceChildren(strong, ' est libre sur ', count, `/${checkable} ${word}`);
-  els.summaryTime.textContent = `en ${formatMs(elapsed)}`;
+  els.summaryTime.textContent = elapsed ? `en ${formatMs(elapsed)}` : '';
   els.copy.setAttribute('aria-label', `Copier « ${username} »`);
-  motion.summaryIn(els.summaryText, count, available);
+  motion.summaryIn(els.summaryText, count, available, from);
+}
+
+// ---------------------------------------------------------------- manual check
+
+function startAsking(card) {
+  card.dataset.asking = '';
+  // The profile opens in a new tab; the question waits here for the user's return.
+  requestAnimationFrame(() => card.querySelector('.ask__btn[data-verdict]')?.focus({ preventScroll: true }));
+}
+
+function applyManualVerdict(card, verdict) {
+  const id = card.dataset.platform;
+  const before = computeSummary().available;
+  const url = card.querySelector('.card__link').getAttribute('href');
+  motion.settle(card);
+  paint(id, verdict, {
+    detail: MANUAL_DETAIL[verdict],
+    url,
+    reliability: verdict === 'taken' ? 'high' : 'medium',
+    method: 'manual',
+    manual: true,
+  });
+  motion.reveal(card, verdict);
+  const view = state.views.get(id);
+  if (view.seg) motion.segment(view.seg);
+  if (state.done) summaryDone(state.username, computeSummary(), state.elapsed, before);
+}
+
+function onGridClick(event) {
+  const card = event.target.closest('.card');
+  if (!card) return;
+  if (event.target.closest('.card__link') && card.dataset.state === 'uncertain') {
+    startAsking(card); // the link still opens the profile (no preventDefault)
+    return;
+  }
+  const verdict = event.target.closest('[data-verdict]')?.dataset.verdict;
+  if (verdict) {
+    applyManualVerdict(card, verdict);
+    card.querySelector('.card__link')?.focus({ preventScroll: true });
+    return;
+  }
+  if (event.target.closest('.ask__cancel')) {
+    delete card.dataset.asking;
+    card.querySelector('.card__link')?.focus({ preventScroll: true });
+  }
 }
 
 // ---------------------------------------------------------------- search
@@ -278,13 +332,11 @@ function revealResult(result) {
     url: result.url,
     reliability: result.reliability,
     elapsed: result.elapsed_ms,
+    method: result.method,
+    cached: result.cached,
   });
-  if (view.kind === 'mini') {
-    motion.miniReveal(view.el);
-  } else {
-    motion.reveal(view.el, result.status);
-    if (view.seg) motion.segment(view.seg);
-  }
+  motion.reveal(view.el, result.status);
+  if (view.seg) motion.segment(view.seg);
 }
 
 function setBusy(busy) {
@@ -312,6 +364,8 @@ async function runSearch(raw) {
   state.chain = Promise.resolve();
   state.revealAt = performance.now() + motion.pacing().minLoading;
   state.username = username;
+  state.elapsed = null;
+  state.done = false;
 
   const url = new URL(window.location.href);
   url.searchParams.set('u', username);
@@ -325,7 +379,7 @@ async function runSearch(raw) {
     motion.settle(view.el);
     paint(id, 'loading');
     if (view.seg) view.seg.dataset.state = 'loading';
-    if (view.kind === 'card') cards.push(view.el);
+    cards.push(view.el);
   }
   motion.toLoading(cards);
 
@@ -338,7 +392,15 @@ async function runSearch(raw) {
         if (event.type === 'result') enqueue(run, () => revealResult(event.result));
         if (event.type === 'done') {
           finished = true;
-          enqueue(run, () => summaryDone(event), motion.pacing().summaryDelay);
+          enqueue(
+            run,
+            () => {
+              state.elapsed = event.elapsed_ms;
+              state.done = true;
+              summaryDone(event.username, computeSummary(), event.elapsed_ms);
+            },
+            motion.pacing().summaryDelay,
+          );
         }
       },
     });
@@ -435,6 +497,7 @@ async function init() {
     }
   });
   els.copy.addEventListener('click', onCopy);
+  els.grid.addEventListener('click', onGridClick);
 
   getHealth()
     .then((health) => {
@@ -449,7 +512,7 @@ async function init() {
   try {
     const platforms = await getPlatforms();
     platforms.forEach(addPlatform);
-    motion.cardsIn([...els.grid.children, ...els.extras.children]);
+    motion.cardsIn([...els.grid.children]);
   } catch (err) {
     showError(err.message || 'Impossible de charger les plateformes.');
     return;

@@ -44,7 +44,16 @@ export function initTooltips(tooltip) {
 
   const triggerOf = (event) => event.target.closest?.('[data-tip]');
 
+  // Mouse: open on an actual movement over the trigger, not on a pointerover
+  // caused by the layout changing under a still cursor (e.g. right after a click).
+  // Touch and pen: open on pointerover, which a tap produces.
+  document.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    const trigger = triggerOf(e);
+    if (trigger && trigger !== current) show(trigger);
+  });
   document.addEventListener('pointerover', (e) => {
+    if (e.pointerType === 'mouse') return;
     const trigger = triggerOf(e);
     if (trigger && trigger !== current) show(trigger);
   });

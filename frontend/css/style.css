@@ -915,6 +915,10 @@ main {
   opacity: 1;
 }
 
+.card__time[data-kind="manual"] {
+  color: var(--accent-2);
+}
+
 .card__status {
   display: flex;
   align-items: center;
@@ -1090,6 +1094,110 @@ main {
   color: var(--text);
 }
 
+/* Informational card (platform we deliberately don't verify, e.g. Gmail) */
+.card[data-variant="info"] {
+  border-style: dashed;
+}
+
+.card[data-variant="info"] .card__logo {
+  color: var(--text-2);
+}
+
+.reliability__info {
+  display: none;
+}
+
+.reliability__info svg {
+  width: 15px;
+  height: 15px;
+  vertical-align: -3px;
+}
+
+.card[data-state="unverifiable"] .meter {
+  display: none;
+}
+
+.card[data-state="unverifiable"] .reliability__info {
+  display: inline;
+}
+
+/* Manual check: after "Vérifier ↗", the footer asks what the user saw. */
+.ask {
+  display: none;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+}
+
+.card[data-asking] .ask {
+  display: flex;
+}
+
+.card[data-asking] .reliability,
+.card[data-asking] .card__link {
+  display: none;
+}
+
+.ask__q {
+  margin-right: auto;
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ask__btn {
+  display: inline-grid;
+  place-items: center;
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.15s var(--ease);
+}
+
+.ask__btn:active {
+  transform: scale(0.95);
+}
+
+.ask__btn[data-verdict="taken"]:hover,
+.ask__btn[data-verdict="taken"]:focus-visible {
+  border-color: var(--taken-line);
+  background: var(--taken-soft);
+  color: var(--taken);
+}
+
+.ask__btn[data-verdict="available"]:hover,
+.ask__btn[data-verdict="available"]:focus-visible {
+  border-color: var(--free-line);
+  background: var(--free-soft);
+  color: var(--free);
+}
+
+.ask__cancel {
+  width: 28px;
+  padding: 0;
+  color: var(--text-3);
+}
+
+.ask__cancel:hover {
+  color: var(--text);
+}
+
+.ask__cancel svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
 /* ------------------------------------------------------------------ status icon */
 
 .sicon {
@@ -1144,8 +1252,14 @@ main {
 .card[data-state="available"] .sicon__ring,
 .card[data-state="taken"] .sicon__ring,
 .card[data-state="uncertain"] .sicon__ring,
-.card[data-state="invalid"] .sicon__ring {
+.card[data-state="invalid"] .sicon__ring,
+.card[data-state="unverifiable"] .sicon__ring {
   stroke-dashoffset: 0;
+}
+
+.card[data-state="unverifiable"] .sicon__dash {
+  stroke-dashoffset: 0;
+  opacity: 1;
 }
 
 .card[data-state="available"] .sicon__check,
@@ -1158,112 +1272,6 @@ main {
 
 .card[data-state="uncertain"] .sicon__question-dot {
   opacity: 1;
-}
-
-/* ------------------------------------------------------------------ extras (Gmail) */
-
-.extras {
-  display: grid;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.mini {
-  display: grid;
-  grid-template-columns: auto auto auto auto 1fr;
-  align-items: center;
-  gap: 12px;
-  min-height: 64px;
-  padding: 12px 16px;
-  border: 1px dashed var(--line-2);
-  border-radius: var(--r-lg);
-  background: rgba(17, 17, 24, 0.55);
-  transition: border-color 0.5s var(--ease);
-}
-
-.mini__logo {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--line-2);
-  border-radius: 10px;
-  background: var(--surface-3);
-  color: var(--text-2);
-}
-
-.mini__logo svg {
-  width: 16px;
-  height: 16px;
-}
-
-.mini__name {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.mini__pill {
-  padding: 4px 10px;
-  border: 1px solid var(--line-2);
-  border-radius: 999px;
-  background: var(--surface-2);
-  color: var(--text-2);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.mini[data-state="invalid"] {
-  border-color: var(--neutral-line);
-}
-
-.mini[data-state="invalid"] .mini__pill {
-  border-color: var(--neutral-line);
-  color: var(--text);
-}
-
-.mini[data-state="loading"] .mini__pill {
-  color: transparent;
-  background: linear-gradient(90deg, var(--surface-3) 25%, #2a2838 50%, var(--surface-3) 75%);
-  background-size: 300% 100%;
-  animation: shimmer 1.5s linear infinite;
-}
-
-.mini__info {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  margin-left: -6px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: var(--text-3);
-  cursor: help;
-  transition: background 0.2s, color 0.2s;
-}
-
-.mini__info:hover,
-.mini__info:focus-visible {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text);
-}
-
-.info-icon {
-  width: 16px;
-  height: 16px;
-}
-
-.mini__detail {
-  margin: 0;
-  overflow: hidden;
-  color: var(--text-3);
-  font-size: 13px;
-  text-align: right;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* ------------------------------------------------------------------ tooltip */
@@ -1444,30 +1452,6 @@ main {
 
   .card {
     min-height: 0;
-  }
-
-  .mini {
-    grid-template-columns: auto auto 1fr auto;
-    row-gap: 8px;
-  }
-
-  .mini__pill {
-    justify-self: end;
-  }
-
-  .mini__info {
-    margin-left: 0;
-  }
-
-  .mini__detail {
-    display: -webkit-box;
-    grid-column: 1 / -1;
-    min-height: 3em; /* 2 lines reserved: no jump when the message changes */
-    text-align: left;
-    white-space: normal;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
   }
 }
 

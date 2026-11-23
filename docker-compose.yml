@@ -3,10 +3,13 @@ services:
     build: .
     image: claimd:local
     # Compose lit automatiquement le fichier .env du dossier pour ces variables.
-    # S'il n'existe pas, l'app démarre quand même (Twitch passe en « incertain »).
+    # S'il n'existe pas, l'app démarre quand même (les cartes sans clés passent en « incertain »).
     environment:
       TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:-}
       TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-}
+      KICK_CLIENT_ID: ${KICK_CLIENT_ID:-}
+      KICK_CLIENT_SECRET: ${KICK_CLIENT_SECRET:-}
+      INSTAGRAM_SESSIONID: ${INSTAGRAM_SESSIONID:-}
       CHECK_TIMEOUT: ${CHECK_TIMEOUT:-5}
     ports:
       # Publié sur localhost uniquement. Sur un VPS, remplace par "${PORT:-8000}:8000"

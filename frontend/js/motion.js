@@ -20,6 +20,7 @@ const GLYPHS = {
   taken: ['.sicon__cross-a', '.sicon__cross-b'],
   uncertain: ['.sicon__question'],
   invalid: ['.sicon__ban'],
+  unverifiable: ['.sicon__dash'],
 };
 
 export function intro() {
@@ -129,15 +130,6 @@ export function reveal(card, state) {
   }
 }
 
-export function miniReveal(element) {
-  if (!enabled()) return;
-  gsap().fromTo(
-    element.querySelectorAll('.mini__pill, .mini__detail'),
-    { y: 6, opacity: 0 },
-    { y: 0, opacity: 1, duration: 0.5, ease: 'power3.out', stagger: 0.06, clearProps: 'transform,opacity' },
-  );
-}
-
 export function segment(seg) {
   if (!enabled()) return;
   gsap().fromTo(
@@ -147,13 +139,15 @@ export function segment(seg) {
   );
 }
 
-export function summaryIn(element, countEl, to) {
+export function summaryIn(element, countEl, to, from = 0) {
   if (!enabled()) return;
   const g = gsap();
-  g.fromTo(element, { y: 6, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: 'power3.out', clearProps: 'transform,opacity' });
-  if (countEl) {
-    const counter = { value: 0 };
-    countEl.textContent = '0';
+  if (from === 0) {
+    g.fromTo(element, { y: 6, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: 'power3.out', clearProps: 'transform,opacity' });
+  }
+  if (countEl && from !== to) {
+    const counter = { value: from };
+    countEl.textContent = String(from);
     g.to(counter, {
       value: to,
       duration: 0.8,

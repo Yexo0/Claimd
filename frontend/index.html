@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#08080c">
-  <meta name="description" content="Claimd vérifie en parallèle si un pseudo est libre sur Twitch, YouTube, Instagram et TikTok.">
+  <meta name="description" content="Claimd vérifie en parallèle si un pseudo est libre sur Twitch, YouTube, Instagram, TikTok, Kick, Bluesky et Steam.">
   <title>Claimd · ton pseudo est-il libre ?</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preload" href="/fonts/geist-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
@@ -97,7 +97,6 @@
         </div>
 
         <div class="grid" id="grid" aria-busy="false"></div>
-        <div class="extras" id="extras"></div>
       </section>
     </main>
 
@@ -139,20 +138,19 @@
       <footer class="card__foot">
         <button class="reliability" type="button" data-tip="">
           <span class="meter" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="reliability__info" aria-hidden="true"></span>
           <span class="reliability__label"></span>
         </button>
         <a class="card__link" target="_blank" rel="noopener noreferrer" hidden></a>
+        <div class="ask" role="group" aria-label="Ce que tu as vu sur la plateforme">
+          <span class="ask__q">Résultat&nbsp;?</span>
+          <button class="ask__btn" type="button" data-verdict="taken">Pris</button>
+          <button class="ask__btn" type="button" data-verdict="available">Libre</button>
+          <button class="ask__btn ask__cancel" type="button" aria-label="Annuler">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>
+          </button>
+        </div>
       </footer>
-    </article>
-  </template>
-
-  <template id="mini-template">
-    <article class="mini" data-state="unverifiable">
-      <span class="mini__logo" aria-hidden="true"></span>
-      <h2 class="mini__name"></h2>
-      <span class="mini__pill"></span>
-      <button class="mini__info" type="button" data-tip=""></button>
-      <p class="mini__detail"></p>
     </article>
   </template>
 
