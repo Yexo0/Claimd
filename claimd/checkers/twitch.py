@@ -30,6 +30,10 @@ PLATFORM = Platform(
     reliability="high",
     profile_url="https://www.twitch.tv/{username}",
     rules="4 à 25 caractères : lettres, chiffres et _ (pas en première position).",
+    note=(
+        "API officielle Twitch (Helix). « Pris » est certain. « Libre » veut dire "
+        "« aucun compte actif » : un compte suspendu ou un nom libéré récemment peut encore le bloquer."
+    ),
 )
 
 TOKEN_URL = "https://id.twitch.tv/oauth2/token"

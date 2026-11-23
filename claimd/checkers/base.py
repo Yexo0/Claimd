@@ -26,6 +26,7 @@ class Platform:
     reliability: Reliability  # nominal reliability of a definite answer
     profile_url: Optional[str] = None  # template containing "{username}"
     rules: Optional[str] = None  # username rules, shown when the input is invalid
+    note: Optional[str] = None  # how the check works and its limits (UI tooltip)
     verifiable: bool = True
 
     def url_for(self, username: str) -> Optional[str]:
@@ -103,6 +104,7 @@ class Platform:
             verifiable=self.verifiable,
             configured=configured,
             rules=self.rules,
+            note=self.note,
             profile_url=self.profile_url,
         )
 

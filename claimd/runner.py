@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Optional, Sequence
+from typing import AsyncIterator, Collection, Optional, Sequence
 
 from claimd import checkers as registry
 from claimd import config
@@ -52,23 +52,47 @@ async def run_checker(checker: Checker, username: str, timeout: float) -> Result
     return result.model_copy(update={"elapsed_ms": elapsed_ms})
 
 
+def _selection(checkers: Optional[Sequence[Checker]], timeout: Optional[float]) -> tuple[Sequence[Checker], float]:
+    selected = registry.CHECKERS if checkers is None else checkers
+    limit = timeout if timeout is not None else config.get_settings().check_timeout
+    return selected, limit
+
+
 async def check_all(
     username: str,
     checkers: Optional[Sequence[Checker]] = None,
     timeout: Optional[float] = None,
 ) -> list[Result]:
-    selected = registry.CHECKERS if checkers is None else checkers
-    limit = timeout if timeout is not None else config.get_settings().check_timeout
+    """Every result, in registry (display) order, once the slowest checker is done."""
+    selected, limit = _selection(checkers, timeout)
     return list(await asyncio.gather(*(run_checker(c, username, limit) for c in selected)))
 
 
-def summarize(results: Sequence[Result]) -> Summary:
+async def iter_results(
+    username: str,
+    checkers: Optional[Sequence[Checker]] = None,
+    timeout: Optional[float] = None,
+) -> AsyncIterator[Result]:
+    """Yield each result as soon as its checker finishes (fastest first)."""
+    selected, limit = _selection(checkers, timeout)
+    tasks = [asyncio.ensure_future(run_checker(c, username, limit)) for c in selected]
+    try:
+        for next_done in asyncio.as_completed(tasks):
+            yield await next_done
+    finally:
+        # Client gone or consumer stopped early: don't leave probes running.
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+
+
+def summarize(results: Sequence[Result], unverifiable_ids: Collection[str] = ()) -> Summary:
     def count(status: str) -> int:
         return sum(1 for r in results if r.status == status)
 
     return Summary(
         total=len(results),
-        checkable=sum(1 for r in results if r.status != "unverifiable"),
+        checkable=sum(1 for r in results if r.status != "unverifiable" and r.platform not in unverifiable_ids),
         available=count("available"),
         taken=count("taken"),
         uncertain=count("uncertain"),

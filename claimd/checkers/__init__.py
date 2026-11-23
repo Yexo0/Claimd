@@ -10,14 +10,20 @@ The order of CHECKERS is the display order in the UI.
 
 from __future__ import annotations
 
-from claimd.checkers import twitch
+from claimd.checkers import gmail, instagram, tiktok, twitch, youtube
 from claimd.checkers.base import Checker, Platform
 
-CHECKERS: tuple[Checker, ...] = (twitch,)  # type: ignore[assignment]
+CHECKERS: tuple[Checker, ...] = (twitch, youtube, instagram, tiktok, gmail)  # type: ignore[assignment]
 
-__all__ = ["CHECKERS", "Checker", "Platform", "is_configured"]
+__all__ = ["CHECKERS", "Checker", "Platform", "is_configured", "unverifiable_ids"]
 
 
 def is_configured(checker: Checker) -> bool:
     probe = getattr(checker, "is_configured", None)
     return bool(probe()) if callable(probe) else True
+
+
+def unverifiable_ids(checkers=None) -> frozenset[str]:
+    """Platforms shown for information only; they don't count in "free on X/N"."""
+    selected = CHECKERS if checkers is None else checkers
+    return frozenset(c.PLATFORM.id for c in selected if not c.PLATFORM.verifiable)

@@ -65,4 +65,5 @@ class PlatformInfo(BaseModel):
     verifiable: bool
     configured: bool
     rules: Optional[str] = None
+    note: Optional[str] = None
     profile_url: Optional[str] = None  # template containing "{username}"

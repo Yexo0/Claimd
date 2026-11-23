@@ -3,7 +3,9 @@ from __future__ import annotations
 import types
 from typing import Awaitable, Callable
 
+import httpcore
 import pytest
+from httpcore._backends.auto import AutoBackend
 
 from claimd import config, http
 from claimd.checkers import twitch
@@ -16,9 +18,20 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
+async def _network_disabled(self, *args, **kwargs):
+    raise httpcore.ConnectError("real network is disabled in tests")
+
+
 @pytest.fixture(autouse=True)
 def hermetic(monkeypatch):
-    """Isolate every test from the developer's real .env and from shared state."""
+    """Isolate every test from the real network, the developer's .env and shared state.
+
+    Sockets are refused at the lowest level (httpcore's network backend), which
+    respx never reaches when it mocks a route: mocked routes keep working and
+    any real request fails like an unreachable host.
+    """
+    monkeypatch.setattr(AutoBackend, "connect_tcp", _network_disabled)
+    monkeypatch.setattr(AutoBackend, "connect_unix_socket", _network_disabled)
     current = config.Settings()
     monkeypatch.setattr(config, "get_settings", lambda: current)
     twitch.reset_token_cache()
