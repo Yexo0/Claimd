@@ -1,0 +1,15 @@
+services:
+  claimd:
+    build: .
+    image: claimd:local
+    # Compose lit automatiquement le fichier .env du dossier pour ces variables.
+    # S'il n'existe pas, l'app démarre quand même (Twitch passe en « incertain »).
+    environment:
+      TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:-}
+      TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-}
+      CHECK_TIMEOUT: ${CHECK_TIMEOUT:-5}
+    ports:
+      # Publié sur localhost uniquement. Sur un VPS, remplace par "${PORT:-8000}:8000"
+      # (et mets un reverse proxy HTTPS devant).
+      - "127.0.0.1:${PORT:-8000}:8000"
+    restart: unless-stopped
