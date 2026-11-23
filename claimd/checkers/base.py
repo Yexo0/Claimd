@@ -28,6 +28,9 @@ class Platform:
     rules: Optional[str] = None  # username rules, shown when the input is invalid
     note: Optional[str] = None  # how the check works and its limits (UI tooltip)
     verifiable: bool = True
+    # Seconds a definite answer is reused for the same name (0 = never). Useful
+    # for platforms that rate-limit hard: re-running a search doesn't hit them.
+    cache_ttl: int = 0
 
     def url_for(self, username: str) -> Optional[str]:
         if not self.profile_url:
@@ -45,6 +48,7 @@ class Platform:
         reason: Optional[str] = None,
         detail: Optional[str] = None,
         link: bool = True,
+        url: Optional[str] = None,
     ) -> Result:
         return Result(
             platform=self.id,
@@ -56,7 +60,7 @@ class Platform:
             reliability=reliability or self.reliability,
             reason=reason,
             detail=detail,
-            url=self.url_for(username) if link else None,
+            url=(url or self.url_for(username)) if link else None,
         )
 
     def available(self, username: str, **kwargs) -> Result:
@@ -95,11 +99,11 @@ class Platform:
             link=False,
         )
 
-    def info(self, *, configured: bool = True) -> PlatformInfo:
+    def info(self, *, configured: bool = True, method: Optional[str] = None) -> PlatformInfo:
         return PlatformInfo(
             id=self.id,
             label=self.label,
-            method=self.method,
+            method=method or self.method,
             reliability=self.reliability,
             verifiable=self.verifiable,
             configured=configured,

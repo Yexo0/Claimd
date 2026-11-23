@@ -49,7 +49,7 @@ async def health() -> dict:
 @app.get("/platforms", response_model=list[PlatformInfo], tags=["check"])
 async def platforms() -> list[PlatformInfo]:
     """Platforms in display order, so the UI can lay out its cards before any check."""
-    return [c.PLATFORM.info(configured=registry.is_configured(c)) for c in registry.CHECKERS]
+    return [registry.info(c) for c in registry.CHECKERS]
 
 
 @app.get("/check/{username}", response_model=CheckResponse, tags=["check"])

@@ -7,8 +7,8 @@ import httpcore
 import pytest
 from httpcore._backends.auto import AutoBackend
 
-from claimd import config, http
-from claimd.checkers import twitch
+from claimd import config, http, runner
+from claimd.checkers import kick, twitch
 from claimd.checkers.base import Platform
 from claimd.models import Result
 
@@ -35,9 +35,13 @@ def hermetic(monkeypatch):
     current = config.Settings()
     monkeypatch.setattr(config, "get_settings", lambda: current)
     twitch.reset_token_cache()
+    kick.reset_token_cache()
+    runner.clear_cache()
     http._client = None
     yield
     twitch.reset_token_cache()
+    kick.reset_token_cache()
+    runner.clear_cache()
     http._client = None
 
 

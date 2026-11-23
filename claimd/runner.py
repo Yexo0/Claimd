@@ -16,6 +16,27 @@ logger = logging.getLogger("claimd")
 
 MAX_USERNAME_LENGTH = 64
 
+# Uncertain answers that mean "the platform is pushing back": kept briefly so a
+# re-run doesn't make the block worse, never longer than this.
+BACKOFF_REASONS = {"rate_limited", "login_wall", "blocked"}
+BACKOFF_TTL = 60.0
+
+_cache: dict[tuple[str, str], tuple[float, Result]] = {}
+
+
+def clear_cache() -> None:
+    _cache.clear()
+
+
+def _cache_ttl(ttl: int, result: Result) -> float:
+    if ttl <= 0:
+        return 0.0
+    if result.status in ("available", "taken", "invalid"):
+        return float(ttl)
+    if result.status == "uncertain" and result.reason in BACKOFF_REASONS:
+        return min(BACKOFF_TTL, float(ttl))
+    return 0.0
+
 
 def normalize_username(raw: str) -> str:
     """Trim whitespace and one leading '@' (people paste handles like '@yexo')."""
@@ -38,6 +59,14 @@ def global_input_error(username: str) -> Optional[str]:
 
 async def run_checker(checker: Checker, username: str, timeout: float) -> Result:
     platform = checker.PLATFORM
+    key = (platform.id, username.lower())
+    hit = _cache.get(key)
+    if hit is not None:
+        expires_at, cached = hit
+        if expires_at > time.monotonic():
+            return cached.model_copy(update={"cached": True, "elapsed_ms": 0, "username": username})
+        del _cache[key]
+
     started = time.perf_counter()
     try:
         result = await asyncio.wait_for(checker.check(username), timeout=timeout)
@@ -49,7 +78,11 @@ async def run_checker(checker: Checker, username: str, timeout: float) -> Result
         logger.exception("Checker %r crashed for username %r", platform.id, username)
         result = platform.uncertain(username, reason="internal_error", detail="Erreur inattendue pendant la vérification.")
     elapsed_ms = round((time.perf_counter() - started) * 1000)
-    return result.model_copy(update={"elapsed_ms": elapsed_ms})
+    result = result.model_copy(update={"elapsed_ms": elapsed_ms})
+    ttl = _cache_ttl(platform.cache_ttl, result)
+    if ttl:
+        _cache[key] = (time.monotonic() + ttl, result)
+    return result
 
 
 def _selection(checkers: Optional[Sequence[Checker]], timeout: Optional[float]) -> tuple[Sequence[Checker], float]:

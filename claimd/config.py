@@ -36,6 +36,9 @@ def _int_env(name: str, default: int) -> int:
 class Settings:
     twitch_client_id: str = ""
     twitch_client_secret: str = ""
+    kick_client_id: str = ""
+    kick_client_secret: str = ""
+    instagram_sessionid: str = ""  # optional: the user's own Instagram session cookie
     check_timeout: float = DEFAULT_TIMEOUT
     host: str = "127.0.0.1"
     port: int = 8000
@@ -43,6 +46,10 @@ class Settings:
     @property
     def twitch_configured(self) -> bool:
         return bool(self.twitch_client_id and self.twitch_client_secret)
+
+    @property
+    def kick_configured(self) -> bool:
+        return bool(self.kick_client_id and self.kick_client_secret)
 
 
 @lru_cache(maxsize=1)
@@ -52,6 +59,9 @@ def get_settings() -> Settings:
     return Settings(
         twitch_client_id=os.getenv("TWITCH_CLIENT_ID", "").strip(),
         twitch_client_secret=os.getenv("TWITCH_CLIENT_SECRET", "").strip(),
+        kick_client_id=os.getenv("KICK_CLIENT_ID", "").strip(),
+        kick_client_secret=os.getenv("KICK_CLIENT_SECRET", "").strip(),
+        instagram_sessionid=os.getenv("INSTAGRAM_SESSIONID", "").strip(),
         check_timeout=_float_env("CHECK_TIMEOUT", DEFAULT_TIMEOUT),
         host=os.getenv("HOST", "127.0.0.1").strip() or "127.0.0.1",
         port=_int_env("PORT", 8000),

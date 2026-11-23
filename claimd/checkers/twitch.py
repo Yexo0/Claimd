@@ -12,14 +12,12 @@ while, so "available" means "no active account", not "guaranteed claimable".
 from __future__ import annotations
 
 import re
-import time
-from dataclasses import dataclass
-from typing import Optional
 
 import httpx
 
 from claimd import config
 from claimd.checkers.base import Platform
+from claimd.checkers.oauth import AppToken, AuthError
 from claimd.http import get_client
 from claimd.models import Result
 
@@ -41,21 +39,7 @@ USERS_URL = "https://api.twitch.tv/helix/users"
 
 LOGIN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_]{3,24}")
 
-# Refresh the token a minute before Twitch says it expires.
-TOKEN_EXPIRY_MARGIN = 60.0
-
-
-@dataclass
-class _Token:
-    value: str
-    expires_at: float  # time.monotonic() deadline
-
-
-_token: Optional[_Token] = None
-
-
-class _AuthError(Exception):
-    """Twitch rejected the client id / secret."""
+_token = AppToken(TOKEN_URL)
 
 
 def is_configured() -> bool:
@@ -63,35 +47,11 @@ def is_configured() -> bool:
 
 
 def reset_token_cache() -> None:
-    global _token
-    _token = None
+    _token.reset()
 
 
 async def _app_token(client: httpx.AsyncClient, settings: config.Settings, *, force: bool = False) -> str:
-    global _token
-    now = time.monotonic()
-    if not force and _token is not None and _token.expires_at > now:
-        return _token.value
-
-    resp = await client.post(
-        TOKEN_URL,
-        data={
-            "client_id": settings.twitch_client_id,
-            "client_secret": settings.twitch_client_secret,
-            "grant_type": "client_credentials",
-        },
-    )
-    if resp.status_code in (400, 401, 403):
-        raise _AuthError(resp.status_code)
-    resp.raise_for_status()
-
-    payload = resp.json()
-    value = payload["access_token"]
-    if not isinstance(value, str) or not value:
-        raise ValueError("empty access_token")
-    expires_in = float(payload.get("expires_in") or 3600)
-    _token = _Token(value=value, expires_at=now + max(expires_in - TOKEN_EXPIRY_MARGIN, 30.0))
-    return value
+    return await _token.get(client, settings.twitch_client_id, settings.twitch_client_secret, force=force)
 
 
 async def _get_users(client: httpx.AsyncClient, settings: config.Settings, login: str, token: str) -> httpx.Response:
@@ -131,7 +91,7 @@ async def check(username: str) -> Result:
             # Token revoked or expired early: get a fresh one and retry once.
             token = await _app_token(client, settings, force=True)
             resp = await _get_users(client, settings, login, token)
-    except _AuthError:
+    except AuthError:
         return PLATFORM.uncertain(
             username,
             reason="auth_failed",

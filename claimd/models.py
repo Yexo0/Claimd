@@ -30,6 +30,7 @@ class Result(BaseModel):
     detail: Optional[str] = None  # human-readable explanation (French)
     url: Optional[str] = None  # profile URL, to verify by hand
     elapsed_ms: Optional[int] = None
+    cached: bool = False  # served from the short-lived result cache
 
     @model_validator(mode="after")
     def _status_matches_available(self) -> "Result":

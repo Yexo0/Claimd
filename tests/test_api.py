@@ -122,13 +122,14 @@ def test_real_registry_offline_still_answers(client):
     assert res.status_code == 200
     body = res.json()
     by_id = {r["platform"]: r for r in body["results"]}
-    assert list(by_id) == ["twitch", "youtube", "instagram", "tiktok", "gmail"]
+    assert list(by_id) == ["twitch", "youtube", "instagram", "tiktok", "kick", "bluesky", "steam", "gmail"]
     assert by_id["twitch"]["reason"] == "not_configured"
-    for pid in ("youtube", "instagram", "tiktok"):
+    assert by_id["kick"]["reason"] == "not_configured"
+    for pid in ("youtube", "instagram", "tiktok", "bluesky", "steam"):
         assert by_id[pid]["status"] == "uncertain"
         assert by_id[pid]["reason"] == "network_error"
     assert by_id["gmail"]["status"] == "invalid"  # "yexo" is shorter than Gmail's 6 characters
-    assert body["summary"]["checkable"] == 4  # Gmail never counts in "free on X/N"
+    assert body["summary"]["checkable"] == 7  # Gmail never counts in "free on X/N"
 
 
 def test_stream_emits_start_results_and_done(client, fake_registry):
@@ -162,6 +163,17 @@ def test_platforms_expose_notes_and_gmail_is_informational(client):
     assert all(p["note"] for p in platforms.values())
     assert platforms["gmail"]["verifiable"] is False
     assert platforms["gmail"]["method"] == "none"
-    assert [platforms[i]["reliability"] for i in ("twitch", "youtube", "instagram", "tiktok")] == [
-        "high", "medium", "low", "low",
+    assert [platforms[i]["reliability"] for i in ("twitch", "youtube", "instagram", "tiktok", "kick", "bluesky", "steam")] == [
+        "high", "medium", "low", "low", "high", "high", "high",
     ]
+
+
+def test_platforms_reflect_the_instagram_session_mode(client, use_settings):
+    def instagram_method():
+        return next(p for p in client.get("/platforms").json() if p["id"] == "instagram")["method"]
+
+    assert instagram_method() == "http_probe"
+    use_settings(instagram_sessionid="abc%3A123")
+    assert instagram_method() == "session_probe"
+    use_settings(kick_client_id="k", kick_client_secret="s")
+    assert next(p for p in client.get("/platforms").json() if p["id"] == "kick")["configured"] is True
